@@ -7,7 +7,7 @@
  * @see  https://github.com/NKucza/smartmirror-object-detection
  */
 
-Module.register('smartmirror-object-detection',{
+Module.register('SmartMirror-Object-Detection',{
 
 	defaults: {
 		
