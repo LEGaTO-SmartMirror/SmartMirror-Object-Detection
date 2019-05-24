@@ -64,7 +64,7 @@ if __name__ == "__main__":
 	#cap = cv2.VideoCapture(2)
 	#cap.set(3,1920);
 	#cap.set(4,1080);
-	#cv2.namedWindow("object detection", cv2.WINDOW_NORMAL)
+	cv2.namedWindow("object detection", cv2.WINDOW_NORMAL)
 
 	darknet.set_gpu(1)
 
@@ -72,7 +72,7 @@ if __name__ == "__main__":
 	weightPath = "data/yolov3.weights"
 	metaPath = "data/coco.data"
 
-	thresh = 0.7
+	thresh = 0.5
 	hier_thresh=.5
 	nms=.45 
 	debug= False
@@ -121,7 +121,7 @@ if __name__ == "__main__":
 
 		darknet.copy_image_from_bytes(darknet_image,frame_resized.tobytes())
 
-		dets = darknet.detect_image(netMain, metaMain, darknet_image, thresh=0.25)
+		dets = darknet.detect_image(netMain, metaMain, darknet_image, thresh=thresh)
 
 		#detectionArray = np.where(detectionArray >0 , detectionArray -1 , 0)
 	
@@ -185,10 +185,10 @@ if __name__ == "__main__":
 		cv2.putText(frame, str(round(fps_cap)) + " FPS", (50, 100), cv2.FONT_HERSHEY_DUPLEX, fontScale=1, color=(50,255,50), thickness=3)
 		cv2.putText(image_cap, str(round(fps_cap)) + " FPS", (50, 100), cv2.FONT_HERSHEY_DUPLEX, fontScale=1, color=(50,255,50), thickness=3)
 
-		#cv2.imshow("object detection", frame)
+		cv2.imshow("object detection", frame)
 
 		out_cap.write(image_cap)
 	
-		#cv2.waitKey(33)
+		cv2.waitKey(33)
 
 

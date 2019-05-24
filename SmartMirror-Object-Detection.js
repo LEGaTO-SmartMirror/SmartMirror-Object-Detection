@@ -33,6 +33,11 @@ Module.register('SmartMirror-Object-Detection',{
 		if(notification === 'detected') {
 			this.sendNotification('OBJECT_DETECTED', payload);
 			//console.log("[" + this.name + "] " + "object detected: " + payload);
-        };
+        } else if(notification === 'DETECTED_OBJECTS') {
+			this.sendNotification('DETECTED_OBJECTS', payload);
+			//console.log("[" + this.name + "] " + "object detected: " + payload);
+        }else if (notification === 'OBJECT_DET_FPS') {
+			this.sendNotification('OBJECT_DET_FPS', payload);
+		};
 	}
 });
