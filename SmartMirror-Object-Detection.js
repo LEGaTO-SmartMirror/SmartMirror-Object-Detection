@@ -10,7 +10,9 @@
 Module.register('SmartMirror-Object-Detection',{
 
 	defaults: {
-		
+		image_height: 1080,
+		image_width: 1920,
+		image_stream_path: "/dev/shm/camera_image"
 	},
 
 	start: function() {

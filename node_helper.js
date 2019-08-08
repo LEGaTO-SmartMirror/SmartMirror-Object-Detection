@@ -10,7 +10,7 @@ module.exports = NodeHelper.create({
 		const self = this;		
 
 		
-		self.obj_pyshell = new PythonShell('modules/' + this.name + '/yolo-object-detector/object_detection_track.py', {pythonPath: 'python',  args: [JSON.stringify(this.config)]});
+		self.obj_pyshell = new PythonShell('modules/' + this.name + '/yolo-object-detector/object_detection_track.py', {pythonPath: 'python3',  args: [JSON.stringify(this.config)]});
     		
 		self.obj_pyshell.on('message', function (message) {
 			try{
@@ -27,11 +27,12 @@ module.exports = NodeHelper.create({
 					//console.log("[" + self.name + "] detected object: " + parsed_message.detected.name + " center in "  + parsed_message.detected.center);
 					self.sendSocketNotification('DETECTED_OBJECTS', parsed_message);
 				}else if (parsed_message.hasOwnProperty('OBJECT_DET_FPS')){
-					//console.log("[" + self.name + "] detected gestures: " + JSON.stringify(parsed_message));
+					//console.log("[" + self.name + "] object detection fps: " + JSON.stringify(parsed_message));
 					self.sendSocketNotification('OBJECT_DET_FPS', parsed_message.OBJECT_DET_FPS);
 				};	
 			}
 			catch(err) {
+				
 				//console.log(err)
 			}
    		});

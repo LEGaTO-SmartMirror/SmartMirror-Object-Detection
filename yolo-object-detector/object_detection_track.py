@@ -11,10 +11,8 @@ import numpy as np
 import darknet
 from sort import *
 
-def shutdown(self, signum):
-	cap.release()
-	to_node("status", 'Shutdown: Done.')
-	exit()
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning) 
 
 def to_node(type, message):
 	# convert to json and print (node helper will read from stdout)
@@ -25,9 +23,36 @@ def to_node(type, message):
 	# stdout has to be flushed manually to prevent delays in the node helper communication
 	sys.stdout.flush()
 
-FPS = 5.0
+#Full HD image as default
+IMAGE_HEIGHT = 1080
+IMAGE_WIDTH = 1920
+
+try:
+	to_node("status", "starting with config: " + sys.argv[1])
+	config = json.loads(sys.argv[1])
+	if 'image_height' in config:
+		IMAGE_HEIGHT = int(config['image_height'])
+	if 'image_width' in config:
+		IMAGE_WIDTH = int(config['image_width'])
+	if 'image_stream_path' in config:
+		IMAGE_STREAM_PATH = str(config['image_stream_path'])
+		
+except:
+	to_node("status", "starting without config as it was not readable/existent")
+
+
+
+def shutdown(self, signum):
+	cap.release()
+	to_node("status", 'Shutdown: Done.')
+	exit()
+
+
+
+FPS = 1.0
 achieved_FPS = 0.0
 achieved_FPS_counter = 0.0
+
 
 def check_stdin():
 	global FPS
@@ -35,6 +60,7 @@ def check_stdin():
 	while True:
 		lines = sys.stdin.readline()
 		data = json.loads(lines)
+		to_node("status", "Changing: " + json.dumps(data))
 		if 'FPS' in data:
 			FPS = data['FPS']
 
@@ -48,10 +74,10 @@ def convertBack(x, y, w, h):
 def convertToCenterHW(a,b,c,d):
 	h = float(d - b)
 	w = float(c - a)
-	x = float((a + (w/2)) / 1080)
-	y = float((b + (h/2)) / 1920)
+	x = float((a + (w/2)) / IMAGE_WIDTH)
+	y = float((b + (h/2)) / IMAGE_HEIGHT)
 
-	return (x,y),(w/1080,h/1920)
+	return (x,y),(w/IMAGE_WIDTH,h/IMAGE_HEIGHT)
 
 
 if __name__ == "__main__":
@@ -62,23 +88,6 @@ if __name__ == "__main__":
 
 
 	to_node("status", "Object detection is starting...")
-
-	""" 
-	get image from gestreamer appsink!
-	"""
-	cap = cv2.VideoCapture("shmsrc socket-path=/tmp/camera_image ! video/x-raw, format=BGR, width=1080, height=1920, framerate=30/1 ! videoconvert ! video/x-raw, format=BGR ! appsink drop=true", cv2.CAP_GSTREAMER)
-	#cap = cv2.VideoCapture("shmsrc socket-path=/tmp/camera_1m ! video/x-raw, format=BGR, width=1080, height=1920, framerate=30/1 ! videoconvert ! video/x-raw, format=BGR ! appsink drop=true", cv2.CAP_GSTREAMER)
-	#cap = cv2.VideoCapture(3)
-	#cap.set(3,1920);
-	#cap.set(4,1080);
-	#cv2.namedWindow("object detection tracked", cv2.WINDOW_NORMAL)
-
-	"""
-	preparare darknet neural network for hand object detection
-	"""
-
-	darknet.set_gpu(1)
-
 	configPath = "cfg/yolov3.cfg"
 	weightPath = "data/yolov3.weights"
 	metaPath = "data/coco.data"
@@ -90,6 +99,28 @@ if __name__ == "__main__":
 
 	netMain = darknet.load_net_custom(configPath.encode("ascii"), weightPath.encode("ascii"), 0, 1)  # batch size = 1
 	metaMain = darknet.load_meta(metaPath.encode("ascii"))
+
+	#to_node("status", "waiting for 5 sec .. let the camera start..")
+	#time.sleep(5)
+	
+
+	""" 
+	get image from gestreamer appsink!
+	"""
+	cap = cv2.VideoCapture("shmsrc socket-path=" + str(IMAGE_STREAM_PATH) + " ! video/x-raw, format=BGR, width=" + str(IMAGE_WIDTH) + " , height= " + str(IMAGE_HEIGHT) + ", framerate=30/1 ! videoconvert ! video/x-raw, format=BGR ! appsink drop=true", cv2.CAP_GSTREAMER)
+	#cap = cv2.VideoCapture("shmsrc socket-path=/dev/shm/camera_image ! image/jpeg, format=BGR, width=1080, height=1920, framerate=30/1 ! decodebin ! videoconvert  ! appsink drop=true", cv2.CAP_GSTREAMER)
+	#cap = cv2.VideoCapture("shmsrc socket-path=/dev/shm/camera_image ! image/jpeg, format=BGR, width=1080, height=1920, framerate=30/1 ! jpegparse ! jpegdec ! videoconvert ! appsink drop=true", cv2.CAP_GSTREAMER)
+	#cap = cv2.VideoCapture("shmsrc socket-path=/tmp/camera_1m ! video/x-raw, format=BGR, width=1080, height=1920, framerate=30/1 ! videoconvert ! video/x-raw, format=BGR ! appsink drop=true", cv2.CAP_GSTREAMER
+	#cap = cv2.VideoCapture(3)
+	#cap.set(3,1920);
+	#cap.set(4,1080);
+	#cv2.namedWindow("object detection tracked", cv2.WINDOW_NORMAL)
+
+	"""
+	preparare darknet neural network for hand object detection
+	"""
+
+	#darknet.set_gpu(1)
 
 	"""
 	start thread for standart in
@@ -104,8 +135,8 @@ if __name__ == "__main__":
 	signal.signal(signal.SIGINT, shutdown)
 
 	#raster for hand tracing.. here the image resolution 
-	horizontal_division = 270.0
-	vertical_division =  480.0
+	horizontal_division = 480.0 #270.0
+	vertical_division =  270.0 #480.0
 
 	DetectionArray = np.zeros((int(vertical_division),int(horizontal_division),metaMain.classes),dtype=np.uint8)
 
@@ -118,31 +149,34 @@ if __name__ == "__main__":
 	tracker_sort = {}
 	last_detection_list = []
 
+	# Check if cap is open
+	if cap.isOpened() is not True:
+		to_node("status" , "Cannot open image stream. Exiting.")
+		quit()
+
 	while True:
 
-		start_time = time.time()
+		loop_start_time = time.time()
 
 		ret, frame = cap.read()
 		if ret is False:
 			continue
 
-		image_cap = np.zeros((1920,1080,3), np.uint8)
-		image_indicator = np.zeros((1920,1080,3), np.uint8)
-
-		imgUMat = cv2.UMat(frame)
+		#imgUMat = cv2.UMat(frame)
 		
-		frame_rgb = cv2.cvtColor(imgUMat, cv2.COLOR_BGR2RGB)
-		frame_resized = cv2.UMat.get(cv2.resize(frame_rgb,
-                                   (darknet.network_width(netMain),
-                                    darknet.network_height(netMain)),
-                                   interpolation=cv2.INTER_LINEAR))
-
-
+		#frame_rgb = cv2.cvtColor(imgUMat, cv2.COLOR_BGR2RGB)
+		#frame_resized = cv2.UMat.get(cv2.resize(frame_rgb,
+        #                           (darknet.network_width(netMain),
+        #                            darknet.network_height(netMain)),
+        #                           interpolation=cv2.INTER_LINEAR))
+									
+		frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+		frame_resized = cv2.resize(frame_rgb,(darknet.network_width(netMain),darknet.network_height(netMain)),interpolation=cv2.INTER_LINEAR)
+                                   
 		darknet.copy_image_from_bytes(darknet_image,frame_resized.tobytes())
-
+		
 		dets = darknet.detect_image(netMain, metaMain, darknet_image, thresh=thresh)
-
-	
+		
 		DetectionArray = np.where(DetectionArray >0 , DetectionArray -1 , 0)
 
 		tracking_dets = {}
@@ -153,10 +187,10 @@ if __name__ == "__main__":
             det[2][2],\
             det[2][3]
 
-			x = x / darknet.network_width(netMain) * 1080
-			y = y / darknet.network_height(netMain) * 1920
-			w = w / darknet.network_width(netMain) * 1080
-			h = h / darknet.network_height(netMain) * 1920
+			x = x / darknet.network_width(netMain) * IMAGE_WIDTH
+			y = y / darknet.network_height(netMain) * IMAGE_HEIGHT
+			w = w / darknet.network_width(netMain) * IMAGE_WIDTH
+			h = h / darknet.network_height(netMain) * IMAGE_HEIGHT
 
 			xmin, ymin, xmax, ymax = convertBack(float(x), float(y), float(w), float(h))
 			pt1 = (xmin, ymin)
@@ -169,7 +203,7 @@ if __name__ == "__main__":
 						tracking_dets[i] = []
 					tracking_dets[i].append([pt1[0],pt1[1],pt2[0],pt2[1],int(100 * det[1])])
 					break
-
+					
 
 		detection_list = []
 
@@ -189,6 +223,8 @@ if __name__ == "__main__":
 				yrel = int(center_ptr[1] * vertical_division)
 
 				detection_list.append({"TrackID": tracker[4], "name": metaMain.names[key].decode('utf-8'), "w_h": (float("{0:.5f}".format(w_h[0])),float("{0:.5f}".format(w_h[1]))) ,"center": (float("{0:.5f}".format(xrel/horizontal_division)),float("{0:.5f}".format(yrel/vertical_division)))} )
+
+
 
 		for key in tracker_sort:
 			if not key in tracking_dets:
@@ -222,7 +258,7 @@ if __name__ == "__main__":
 				
 		achieved_FPS_counter += 1.0
 
-		delta = time.time() - start_time
+		delta = time.time() - loop_start_time
 		
 		if (1.0 / FPS) - delta > 0:
 			time.sleep((1.0 / FPS) - delta)
@@ -240,8 +276,6 @@ if __name__ == "__main__":
 		#cv2.putText(frame, str(round(fps_cap)) + " FPS", (50, 100), cv2.FONT_HERSHEY_DUPLEX, fontScale=1, color=(50,255,50), thickness=3)
 
 		#cv2.imshow("object detection tracked", frame)
-
-		#out_cap.write(image_cap)
-		#out_indicator.write(image_indicator)
 	
-		#cv2.waitKey(33)
+		#cv2.waitKey(1)
+		
