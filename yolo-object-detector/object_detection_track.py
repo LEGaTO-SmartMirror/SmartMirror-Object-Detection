@@ -26,6 +26,8 @@ def to_node(type, message):
 #Full HD image as default
 IMAGE_HEIGHT = 1080
 IMAGE_WIDTH = 1920
+IMAGE_STREAM_PATH = "/dev/shm/camera_image"
+
 
 try:
 	to_node("status", "starting with config: " + sys.argv[1])
@@ -49,7 +51,7 @@ def shutdown(self, signum):
 
 
 
-FPS = 1.0
+FPS = 30.0
 achieved_FPS = 0.0
 achieved_FPS_counter = 0.0
 
