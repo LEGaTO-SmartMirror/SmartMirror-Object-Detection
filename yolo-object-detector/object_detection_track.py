@@ -24,8 +24,13 @@ def to_node(type, message):
 	sys.stdout.flush()
 
 #Full HD image as default
-IMAGE_HEIGHT = 1080
-IMAGE_WIDTH = 1920
+#IMAGE_HEIGHT = 1920
+#IMAGE_WIDTH = 1080
+#IMAGE_STREAM_PATH = "/dev/shm/camera_image"
+
+IMAGE_HEIGHT = 416
+IMAGE_WIDTH = 416
+IMAGE_STREAM_PATH = "/dev/shm/camera_small"
 
 try:
 	to_node("status", "starting with config: " + sys.argv[1])
@@ -82,15 +87,22 @@ def convertToCenterHW(a,b,c,d):
 
 if __name__ == "__main__":
 
+	darknet.set_gpu(1)
+
 
 	BASE_DIR = os.path.dirname(__file__) + '/'
 	os.chdir(BASE_DIR)
 
 
 	to_node("status", "Object detection is starting...")
+	#configPath = "/home/legato/dev/libraries/darknet3/cfg/enet-coco.cfg"
+	#weightPath = "/home/legato/dev/libraries/darknet3/enetb0-coco_final.weights"
 	configPath = "cfg/yolov3.cfg"
 	weightPath = "data/yolov3.weights"
-	metaPath = "data/coco.data"
+	# configPath = "/opt/dev/MagicMirror/modules/SmartMirror-Object-Detection/yolo-object-detector/cfg/yolov3-tiny-prn.cfg"
+	# weightPath = "/opt/dev/MagicMirror/modules/SmartMirror-Object-Detection/yolo-object-detector/data/enetb0-coco_final.weights"
+	metaPath = "/opt/dev/MagicMirror/modules/SmartMirror-Object-Detection/yolo-object-detector/data/coco.data"
+	
 
 	thresh = 0.5
 	hier_thresh=.45
@@ -100,7 +112,7 @@ if __name__ == "__main__":
 	netMain = darknet.load_net_custom(configPath.encode("ascii"), weightPath.encode("ascii"), 0, 1)  # batch size = 1
 	metaMain = darknet.load_meta(metaPath.encode("ascii"))
 
-	#to_node("status", "waiting for 5 sec .. let the camera start..")
+	to_node("status", "Net and meta information loaded.")
 	#time.sleep(5)
 	
 
@@ -120,7 +132,7 @@ if __name__ == "__main__":
 	preparare darknet neural network for hand object detection
 	"""
 
-	#darknet.set_gpu(1)
+	
 
 	"""
 	start thread for standart in
@@ -154,6 +166,7 @@ if __name__ == "__main__":
 		to_node("status" , "Cannot open image stream. Exiting.")
 		quit()
 
+	to_node("status", "Object detection now in while loop")
 	while True:
 
 		loop_start_time = time.time()
@@ -162,16 +175,26 @@ if __name__ == "__main__":
 		if ret is False:
 			continue
 
-		#imgUMat = cv2.UMat(frame)
 		
-		#frame_rgb = cv2.cvtColor(imgUMat, cv2.COLOR_BGR2RGB)
-		#frame_resized = cv2.UMat.get(cv2.resize(frame_rgb,
-        #                           (darknet.network_width(netMain),
-        #                            darknet.network_height(netMain)),
-        #                           interpolation=cv2.INTER_LINEAR))
+		imgUMat = cv2.UMat(frame)
+
+		if (darknet.network_width(netMain) != IMAGE_WIDTH) or ( darknet.network_width(netMain) != IMAGE_HEIGHT):
+
+			frame_resized_tmp = cv2.resize(	imgUMat, 
+					(darknet.network_width(netMain),
+					darknet.network_height(netMain)),                                    						interpolation=cv2.INTER_LINEAR)
+		
+			frame_rgb = cv2.cvtColor(frame_resized_tmp, cv2.COLOR_BGR2RGB)
+
+			frame_resized = cv2.UMat.get(frame_rgb)
+
+		else:
+
+			
+			frame_resized = cv2.UMat.get(cv2.cvtColor(imgUMat, cv2.COLOR_BGR2RGB))
 									
-		frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-		frame_resized = cv2.resize(frame_rgb,(darknet.network_width(netMain),darknet.network_height(netMain)),interpolation=cv2.INTER_LINEAR)
+		#frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+		#frame_resized = cv2.resize(frame_rgb,(darknet.network_width(netMain),darknet.network_height(netMain)),interpolation=cv2.INTER_LINEAR)
                                    
 		darknet.copy_image_from_bytes(darknet_image,frame_resized.tobytes())
 		
@@ -275,7 +298,7 @@ if __name__ == "__main__":
 
 		#cv2.putText(frame, str(round(fps_cap)) + " FPS", (50, 100), cv2.FONT_HERSHEY_DUPLEX, fontScale=1, color=(50,255,50), thickness=3)
 
-		#cv2.imshow("object detection tracked", frame)
+		#cv2.imshow("object detection tracked", frame_resized)
 	
 		#cv2.waitKey(1)
 		
